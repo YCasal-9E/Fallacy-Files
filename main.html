@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fallacy Files</title>
+    
+    <link rel="stylesheet" href="https://pyscript.net/releases/2025.7.3/core.css">
+    <script type="module" src="https://pyscript.net/releases/2025.7.3/core.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body { background: #2c1e14; color: #fdf5e6; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; overflow: hidden; }
+        #game-box { width: 850px; height: 550px; background: #5d4037; border: 8px solid #2d1b0f; border-radius: 15px; position: relative; box-shadow: inset 0 0 100px #000; }
+        
+        #hub-screen, #briefing-screen, #end-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px; }
+        #hub-screen { background: rgba(0,0,0,0.95); }
+        #briefing-screen { background: rgba(26, 26, 26, 0.98); display: none; }
+        #end-screen { display: none; z-index: 110; }
+
+        .case-btn { background: #d4af37; border: 2px solid #fff; padding: 10px; margin: 5px; cursor: pointer; font-weight: bold; border-radius: 5px; width: 420px; color: #1a1a1a; transition: 0.2s; }
+        .case-btn:hover { background: #fff; transform: scale(1.02); }
+
+        #score-tag { position: absolute; top: 15px; left: 15px; background: #d4af37; color: #2c1e14; padding: 5px 20px; font-weight: bold; border-radius: 3px; z-index: 20; }
+        #sprite { position: absolute; top: 50px; right: 50px; font-size: 100px; animation: bounce 1.5s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+
+        #evidence-card { width: 180px; height: 240px; background: #fff; color: #333; padding: 15px; border-radius: 5px; position: absolute; bottom: 40px; left: 40px; cursor: grab; box-shadow: 5px 5px 15px #000; font-size: 13px; z-index: 5; }
+        #drop-zone { width: 240px; height: 300px; border: 4px dashed #d4af37; position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #d4af37; text-align: center; padding: 20px; font-weight: bold; }
+
+        #choice-panel { display: none; position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 450px; background: rgba(0,0,0,0.95); padding: 25px; border-radius: 10px; border: 3px solid #d4af37; text-align: center; z-index: 10; }
+        .logic-btn { font-weight: bold; margin-bottom: 8px; border: 2px solid #fff; }
+        
+        #typewriter-text { font-size: 1.2rem; color: #d4af37; margin-bottom: 30px; min-height: 80px; font-weight: bold; line-height: 1.4; word-wrap: break-word; 
+    overflow-wrap: break-word; }
+        script[type="py"] { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="game-box">
+    <div id="hub-screen">
+        <h1 style="color:#d4af37;">HELLO, DETECTIVE.</h1>
+        <p id="hub-status">Booting Logic Systems...</p>
+        <div id="file-selection" style="display:none;">
+            <button id="case-cookie" class="case-btn">📂 CASE #1: THE COOKIE CRIME</button>
+            <button id="case-toy" class="case-btn">📂 CASE #2: THE BROKEN ROBOT</button>
+            <button id="case-test" class="case-btn">📂 CASE #3: THE STOLEN EXAM (HARD)</button>
+            <button id="case-car" class="case-btn">📂 CASE #4: THE POLKA DOT PORSCHE (HARD)</button>
+        </div>
+    </div>
+
+    <div id="briefing-screen">
+        <h2 style="color:#d4af37; border-bottom: 2px solid #d4af37; padding-bottom: 10px; margin-bottom: 20px;">MISSION BRIEFING</h2>
+        <div id="typewriter-text"></div>
+        <button id="btn-start-investigation" class="case-btn">PROCEED TO SCENE</button>
+    </div>
+
+    <!-- End Screen (Win/Loss) -->
+    <div id="end-screen">
+        <h1 id="end-title" class="display-3 fw-bold text-white"></h1>
+        <p id="end-text" class="fs-4 text-white p-3"></p>
+        <button onclick="location.reload()" class="btn btn-light btn-lg fw-bold">RETURN TO DESK</button>
+    </div>
+
+    <div id="score-tag">SCORE: <span id="score-val">0</span></div>
+    <div id="sprite">🔍</div>
+    
+    <div id="evidence-card" draggable="true" ondragstart="drag(event)">
+        <p class="fw-bold border-bottom border-dark pb-1" id="suspect-name">SUSPECT FILE</p>
+        <p id="evidence-text">Drag to Analyze...</p>
+    </div>
+
+    <div id="drop-zone" ondrop="drop(event)" ondragover="allowDrop(event)">
+        DROP EVIDENCE<br>HERE
+    </div>
+
+    <div id="choice-panel">
+        <h5 class="text-warning mb-3">Analyze Reasoning:</h5>
+        <button id="btn-fact" class="btn btn-primary logic-btn w-100">VALID REASONING</button>
+        <button id="btn-fallacy" class="btn btn-danger logic-btn w-100">LOGIC GAP DETECTED!</button>
+        <div id="feedback" class="mt-2 fw-bold" style="font-size: 0.9rem;"></div>
+        <button id="btn-next" class="btn btn-warning w-100 fw-bold mt-2" style="display:none;">CONTINUE INTERROGATION</button>
+    </div>
+</div>
+
+<script>
+    function allowDrop(ev) { ev.preventDefault(); }
+    function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
+    function drop(ev) {
+        ev.preventDefault();
+        document.getElementById("evidence-card").style.display = "none";
+        document.getElementById("drop-zone").style.display = "none";
+        document.getElementById("choice-panel").style.display = "block";
+    }
+</script>
+
+<script type="py">
+from pyscript import document, when
+import asyncio
+
+score = 0
+case_score = 0 # Track score specifically for the current case
+suspect_idx = 0
+investigation_round = 0
+active_list = []
+current_case_key = ""
+
+all_cases = {
+    "cookie": {
+        "brief": "Someone emptied the jar of cookies. Find whose story doesn't add up.",
+        "win": "Case Solved! The Baby was caught in a loop of fallacies!",
+        "lose": "The Baby escaped! Your logic wasn't sharp enough to pin them down.",
+        "rounds": [
+            [
+                {"n": "Brother", "t": "Look at that bird! It's so big!", "a": "fallacy", "e": "👦", "f": "Red Herring!"},
+                {"n": "Sister", "t": "I was at piano class; here's my music sheet.", "a": "fact", "e": "👧", "f": "Valid alibi."},
+                {"n": "Baby", "t": "You're a poopy-head, you did it!", "a": "fallacy", "e": "👶", "f": "Ad Hominem!"},
+                {"n": "Dog", "t": "I was sleeping in my crate. It's locked.", "a": "fact", "e": "🐕", "f": "Verified Fact."}
+            ],
+            [
+                {"n": "Brother", "t": "I was playing games. I have a saved file as proof.", "a": "fact", "e": "👦", "f": "Cleared!"},
+                {"n": "Baby", "t": "If you don't believe me, I'll never eat broccoli!", "a": "fallacy", "e": "👶", "f": "Appeal to Force! GUILTY!"}
+            ]
+        ]
+    },
+    "toy": {
+        "brief": "The Robot is broken. Interrogate the family to find the careless one.",
+        "win": "Case Solved! You exposed the Cousin's logic gaps!",
+        "lose": "The Cousin mocked your investigation and ran off to play!",
+        "rounds": [
+            [
+                {"n": "Cat", "t": "I don't have thumbs to unscrew things.", "a": "fact", "e": "🐈", "f": "Fact."},
+                {"n": "Dad", "t": "I was at work. Ask my boss.", "a": "fact", "e": "🧔", "f": "Fact."},
+                {"n": "Cousin", "t": "You leave toys out, so it's your fault!", "a": "fallacy", "e": "🧒", "f": "Ad Hominem!"},
+                {"n": "Mom", "t": "If you accuse me of breaking toys, then the whole family will stop trusting each other!", "a": "fallacy", "e": "👩", "f": "Slippery Slope!"}
+            ],
+            [
+                {"n": "Mom", "t": "Actually, I was at the store. Here's the receipt.", "a": "fact", "e": "👩", "f": "Cleared."},
+                {"n": "Cousin", "t": "Everyone else breaks toys, so I can too!", "a": "fallacy", "e": "🧒", "f": "Appeal to Populace! GUILTY!"}
+            ]
+        ]
+    },
+    "test": {
+        "brief": "The Final Exam answer key was stolen! Find the thief.",
+        "win": "Brilliant! You trapped the President in their own circular logic!",
+        "lose": "The President used their authority to end your investigation early!",
+        "rounds": [
+            [
+                {"n": "President", "t": "As your leader, my integrity is beyond question, so I couldn't have done it.", "a": "fallacy", "e": "👔", "f": "Appeal to Authority!"},
+                {"n": "Jock", "t": "The test was stolen; I’m failing Science. That doesn't mean I’m the one who took it just because it benefits me!", "a": "fallacy", "e": "🏈", "f": "Circular Reasoning!"},
+                {"n": "Nerd", "t": "If students start stealing tests, soon the whole grading system will collapse and no one will ever get into college!", "a": "fallacy", "e": "🤓", "f": "Slippery Slope!"},
+                {"n": "Rebel", "t": "You’re only accusing me because I wear a leather jacket and have a 'bad' reputation.", "a": "fallacy", "e": "🧥", "f": "Ad Hominem!"}
+            ],
+            [
+                {"n": "President", "t": "Either you find the real thief today, or you admit that I’m completely innocent.", "a": "fallacy", "e": "👔", "f": "False Dilemma!"},
+                {"n": "Jock", "t": "Everyone in the locker room says the Rebel did it, so it must be true.", "a": "fallacy", "e": "🏈", "f": "Appreal to Populace!"},
+                {"n": "Rebel", "t": "The test went missing after I walked by the desk, but walking by a desk doesn't make someone a thief.", "a": "fallacy", "e": "🧥", "f": "Post Hoc!"},
+                {"n": "Nerd", "t": "I already have a 100% average; I have no motive to risk suspension for an answer key I don't need.", "a": "fact", "e": "🤓", "f": "Fact! Nerd cleared."}
+            ],
+            [
+                {"n": "President", "t": "You haven't found the papers in my locker, which proves they aren't there and I didn't take them.", "a": "fallacy", "e": "👔", "f": "Appeal to Ignorance!"},
+                {"n": "Rebel", "t": "Why are we talking about a paper test when the school's Wi-Fi is so slow? That's the real crime.", "a": "fallacy", "e": "🧥", "f": "Red Herring!"},
+                {"n": "Jock", "t": "The teacher's desk was locked, and I don't have the key or the skills to pick a lock.", "a": "fact", "e": "🏈", "f": "Fact! Jock cleared."}
+            ],
+            [
+                {"n": "Rebel", "t": "The test was stolen during 3rd period, but I was in detention with the Principal the whole time. He can vouch for me.", "a": "fact", "e": "🧥", "f": "Fact! Rebel cleared."},
+                {"n": "President", "t": "I’m innocent because I’ve always been an honest student, and an honest student wouldn't steal.", "a": "fallacy", "e": "👔", "f": "Circular Logic! GUILTY!"}
+            ]
+        ]
+    },
+    "car": {
+        "brief": "A car was spray-painted pink! Solve this messy mystery.",
+        "win": "Case Closed! The Prankster's plea was a total lie!",
+        "lose": "The Prankster laughed in your face and disappeared in a cloud of paint!",
+        "rounds": [
+            [
+                {"n": "Neighbor", "t": "I've lived here for 40 years, so my word should be enough to prove I didn't do it.", "a": "fallacy", "e": "👴", "f": "Appeal to Authority!"},
+                {"n": "Cleaner", "t": "If we don't catch whoever did this now, they'll think they can get away with anything. Next week it'll be a house, then the whole neighborhood!", "a": "fallacy", "e": "🧹", "f": "Slippery Slope!"},
+                {"n": "Prankster", "t": "You can’t prove I did paint the car, so that means I’m innocent.", "a": "fallacy", "e": "🤡", "f": "Appeal to Ignorance!"},
+                {"n": "Owner", "t": "Everyone on the block says the Prankster did it, so it must be true.", "a": "fallacy", "e": "🚿", "f": "Appeal to Populace!"}
+            ],
+            [
+                {"n": "Cleaner", "t": "I’ve told you everything I know. Either you accept that I was just doing my job, or you're calling me a liar. Which is it?", "a": "fallacy", "e": "🧹", "f": "False Dilemma!"},
+                {"n": "Prankster", "t": "You shouldn't listen to anything the Neighbor says about me; he’s just a grumpy old man who hates fun.", "a": "fallacy", "e": "🤡", "f": "Ad Hominem!"},
+                {"n": "Owner", "t": "So you're saying everyone who owns a business on this street is a criminal who wants to ruin their neighbors' property for fun?", "a": "fallacy", "e": "🚿", "f": "Straw Man!"},
+                {"n": "Neighbor", "t": "I was at the community meeting with 20 other people when the car was painted; here is the attendance sheet.", "a": "fact", "e": "👴", "f": "Fact! Cleared."}
+            ],
+            [
+                {"n": "Prankster", "t": "Why are we talking about pink dots when there's a giant pothole on the next street?", "a": "fallacy", "e": "🤡", "f": "Red Herring!"},
+                {"n": "Owner", "t": "I saw a person with a spray can near the driveway; the Prankster always has art supplies, so the Prankster is the culprit.", "a": "fallacy", "e": "🚿", "f": "Hasty Generalization!"},
+                {"n": "Cleaner", "t": "Paint is oil-based; my equipment uses water.", "a": "fact", "e": "🧹", "f": "Fact! Cleared."}
+            ],
+            [
+                {"n": "Owner", "t": "I couldn't have done it because I was at the shop helping a customer fix a flat tire at that exact time. I have the security footage.", "a": "fact", "e": "🚿", "f": "Fact! Cleared."},
+                {"n": "Prankster", "t": "Have you finally decided to stop harassing innocent kids like me and go find a real criminal for once?", "a": "fallacy", "e": "🤡", "f": "Complex Question! GUILTY!"}
+            ]
+        ]
+    }
+}
+
+async def type_briefing(text):
+    area = document.getElementById("typewriter-text")
+    area.innerHTML = ""
+    for char in text:
+        area.innerHTML += "&nbsp;" if char == " " else char
+        await asyncio.sleep(0.03)
+
+@when("click", "#game-box")
+def master_click(event):
+    global score, case_score, suspect_idx, active_list, investigation_round, current_case_key
+    tid = event.target.id
+    if "case-" in tid:
+        current_case_key = tid.replace("case-", "")
+        case_score = 0 # Reset case-specific score
+        document.getElementById("hub-screen").style.display = "none"
+        document.getElementById("briefing-screen").style.display = "flex"
+        asyncio.create_task(type_briefing(all_cases[current_case_key]["brief"]))
+    elif tid == "btn-start-investigation":
+        document.getElementById("briefing-screen").style.display = "none"
+        investigation_round = 0
+        active_list = all_cases[current_case_key]["rounds"][investigation_round]
+        suspect_idx = 0
+        render_round()
+    elif tid == "btn-fact" or tid == "btn-fallacy":
+        suspect = active_list[suspect_idx]
+        choice = "fact" if tid == "btn-fact" else "fallacy"
+        fb = document.getElementById("feedback")
+        if choice == suspect["a"]:
+            score += 10
+            case_score += 10
+            fb.className = "mt-2 fw-bold text-success"
+            fb.innerText = f"CORRECT! {suspect['f']}"
+        else:
+            score -= 5
+            case_score -= 5
+            fb.className = "mt-2 fw-bold text-danger"
+            fb.innerText = "INCORRECT! Logic gap missed."
+        document.getElementById("score-val").innerText = str(score)
+        document.getElementById("btn-fact").style.display = "none"
+        document.getElementById("btn-fallacy").style.display = "none"
+        document.getElementById("btn-next").style.display = "block"
+    elif tid == "btn-next":
+        suspect_idx += 1
+        if suspect_idx < len(active_list):
+            render_round()
+        else:
+            investigation_round += 1
+            if investigation_round < len(all_cases[current_case_key]["rounds"]):
+                active_list = all_cases[current_case_key]["rounds"][investigation_round]
+                suspect_idx = 0
+                render_round()
+            else:
+                finish_case()
+
+def finish_case():
+    global case_score, current_case_key
+    screen = document.getElementById("end-screen")
+    title = document.getElementById("end-title")
+    text = document.getElementById("end-text")
+    
+    # Calculation: Must get at least 60% of logic right to "Solve" it
+    # Max points per case: (number of suspects across all rounds) * 10
+    total_suspects = sum(len(r) for r in all_cases[current_case_key]["rounds"])
+    threshold = total_suspects * 5 # 50% pass rate
+    
+    if case_score >= threshold:
+        title.innerText = "CASE SOLVED! 🏆"
+        text.innerText = all_cases[current_case_key]["win"]
+        screen.style.background = "#27ae60" # Green
+    else:
+        title.innerText = "THEY GOT AWAY! 💨"
+        text.innerText = all_cases[current_case_key]["lose"]
+        screen.style.background = "#c0392b" # Red
+        
+    screen.style.display = "flex"
+
+def render_round():
+    s = active_list[suspect_idx]
+    document.getElementById("choice-panel").style.display = "none"
+    document.getElementById("evidence-card").style.display = "block"
+    document.getElementById("drop-zone").style.display = "flex"
+    document.getElementById("btn-fact").style.display = "block"
+    document.getElementById("btn-fallacy").style.display = "block"
+    document.getElementById("btn-next").style.display = "none"
+    document.getElementById("feedback").innerText = ""
+    document.getElementById("suspect-name").innerText = s["n"]
+    document.getElementById("evidence-text").innerText = s["t"]
+    document.getElementById("sprite").innerText = s["e"]
+
+document.getElementById("hub-status").innerText = "Logic Engine Ready. Select a Case:"
+document.getElementById("file-selection").style.display = "block"
+</script>
+</body>
+</html>
